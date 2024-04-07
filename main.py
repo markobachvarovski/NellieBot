@@ -28,7 +28,7 @@ def get_session_history(session_id: str) -> BaseChatMessageHistory:
 
 def get_urls() -> List[str]:
     urls = []
-    for year in range(2020, 2025):
+    for year in range(2023, 2024):
         for month in months:
             urls.append("https://www.basketball-reference.com/leagues/NBA_" + str(year) + "_games-" + month + ".html")
 
@@ -37,24 +37,9 @@ def get_urls() -> List[str]:
 
 if __name__ == '__main__':
     print("Nellie: Hi! I'm Nellie, your personal NBA assistant. Hang tight while I load some information for you\n")
-    print("Loading information")
 
-    loader = WebBaseLoader(
-        web_paths=(get_urls()),
-        bs_kwargs=dict(
-            parse_only=bs4.SoupStrainer(
-                class_=("table_wrapper")
-            )
-        ),
-    )
-    data = loader.load()
-
-    print("Splitting retrieved information")
-    text_splitter = RecursiveCharacterTextSplitter(chunk_size=10000, chunk_overlap=200)
-    splits = text_splitter.split_documents(data)
-
-    print("Storing information in a vector store")
-    vectorstore = Chroma.from_documents(documents=splits, embedding=OpenAIEmbeddings())
+    print("Fetching information")
+    vectorstore = Chroma(persist_directory="./vectorstores/2023season", embedding_function=OpenAIEmbeddings())
     retriever = vectorstore.as_retriever()
 
     chat = ChatOpenAI()
@@ -113,7 +98,7 @@ if __name__ == '__main__':
             res = conversation.invoke(
                 {"input": userMessage},
                 {"configurable":
-                     {"session_id": "1"}
+                     {"session_id": "3"}
                  },
             )['answer']
             print(res)
