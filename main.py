@@ -39,6 +39,32 @@ if __name__ == '__main__':
 
     chat = ChatOpenAI()
 
+    from langchain_core.prompts import PromptTemplate
+
+    sql_template = '''Given an input question, first create a syntactically correct sqlite query to run, then look at the results of the query and return the answer.
+    Use the following format:
+
+    Question: "Question here"
+    SQLQuery: "SQL Query to run"
+    SQLResult: "Result of the SQLQuery"
+    Answer: "Final answer here"
+
+    Only use the following tables:
+
+    games.
+
+    Question: {input}'''
+    sql_prompt = ChatPromptTemplate.from_messages(
+        [
+            ("system", sql_template),
+            MessagesPlaceholder("messages"),
+            ("human", "{input}"),
+        ]
+    )
+    sql_chain = sql_prompt | chat
+    # sql_chain = create_stuff_documents_chain(chat, sql_prompt)
+    # sql_prompt = PromptTemplate.from_template(sql_template)
+
     print("Creating prompt to contextualize question")
     add_context_to_question_prompt = ChatPromptTemplate.from_messages(
         [
@@ -77,7 +103,7 @@ if __name__ == '__main__':
 
     print("Chaining retrievers together\n")
     conversation = RunnableWithMessageHistory(
-        chain,
+        sql_chain,
         get_session_history,
         input_messages_key="input",
         history_messages_key="messages",
@@ -96,7 +122,6 @@ if __name__ == '__main__':
     # chain = RetrievalQA.from_chain_type(llm=OpenAI(), chain_type="stuff",
     #                                     retriever=docsearch.vectorstore.as_retriever(), input_key="input")
 
-
     print("Nellie: I'm ready! Ask me anything or enter ':q' to quit")
     while True:
         userMessage = input()
@@ -107,7 +132,10 @@ if __name__ == '__main__':
             res = conversation.invoke(
                 {"input": userMessage},
                 {"configurable":
-                    {"session_id": "3"}
+                     {"session_id": "4"}
                  },
-            )['answer']
+            )
             print(res)
+
+            # res = add_context_to_question_retriever.invoke({"input": userMessage})
+            # print(res)
