@@ -4,8 +4,10 @@ from langchain.chains.combine_documents import create_stuff_documents_chain
 from langchain.chains.history_aware_retriever import create_history_aware_retriever
 from langchain.chains.retrieval import create_retrieval_chain
 from langchain.chains.retrieval_qa.base import RetrievalQA
+from langchain.chains.sql_database.query import create_sql_query_chain
 from langchain.indexes import VectorstoreIndexCreator
 from langchain_community.document_loaders.csv_loader import CSVLoader
+from langchain_community.utilities.sql_database import SQLDatabase
 from langchain_core.chat_history import BaseChatMessageHistory
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings, OpenAI
 from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
@@ -41,27 +43,28 @@ if __name__ == '__main__':
 
     from langchain_core.prompts import PromptTemplate
 
-    sql_template = '''Given an input question, first create a syntactically correct sqlite query to run, then look at the results of the query and return the answer.
+    db = SQLDatabase.from_uri("sqlite:///games.db")
+    sql_template = '''Given an input question, first create a syntactically correct sqlite query to run, then look at 
+    the results of the query and return the answer. Select up to {top_k} rows from the following tables: {table_info}
     Use the following format:
 
-    Question: "Question here"
-    SQLQuery: "SQL Query to run"
-    SQLResult: "Result of the SQLQuery"
-    Answer: "Final answer here"
-
-    Only use the following tables:
-
-    games.
-
-    Question: {input}'''
-    sql_prompt = ChatPromptTemplate.from_messages(
-        [
-            ("system", sql_template),
-            MessagesPlaceholder("messages"),
-            ("human", "{input}"),
-        ]
+    Question: "{question}"
+    SQL Query: "query"
+    SQL Result: "result"
+    Answer: "answer"
+    
+    If given a date, format it in the format "MMMM DD, YYYY". Example: november 1st 2022 would be "November 1, 2022". Search for dates in this format
+    {input}
+    '''
+    sql_prompt = PromptTemplate.from_template(sql_template
+        # [
+        #     ("system", sql_template),
+        #     MessagesPlaceholder("messages"),
+        #     ("human", "{input}"),
+        # ]
     )
-    sql_chain = sql_prompt | chat
+    # sql_chain = sql_prompt | chat
+    sql_chain = create_sql_query_chain(chat, db, prompt=sql_prompt)
     # sql_chain = create_stuff_documents_chain(chat, sql_prompt)
     # sql_prompt = PromptTemplate.from_template(sql_template)
 
@@ -129,13 +132,13 @@ if __name__ == '__main__':
             print("Nellie: See you soon!\n\nExited successfully")
             break
         else:
-            res = conversation.invoke(
-                {"input": userMessage},
-                {"configurable":
-                     {"session_id": "4"}
-                 },
-            )
-            print(res)
-
-            # res = add_context_to_question_retriever.invoke({"input": userMessage})
+            # res = conversation.invoke(
+            #     {"input": userMessage},
+            #     {"configurable":
+            #          {"session_id": "4"}
+            #      },
+            # )
             # print(res)
+
+            res = sql_chain.invoke({"input": userMessage, "question": userMessage, "top_k": "20", "table_info": "games"})
+            print(res)
