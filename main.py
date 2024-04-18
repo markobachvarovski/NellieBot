@@ -19,8 +19,6 @@ from dotenv import load_dotenv
 
 session_store = {}
 
-months = ["october", "november", "december", "january", "february", "march", "april", "may", "june"]
-
 
 def get_session_history(session_id: str) -> BaseChatMessageHistory:
     if session_id not in session_store:
