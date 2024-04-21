@@ -9,7 +9,7 @@ from langchain_community.document_loaders.csv_loader import CSVLoader
 from langchain_community.utilities.sql_database import SQLDatabase
 from langchain_core.chat_history import BaseChatMessageHistory
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings, OpenAI
-from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langchain.prompts import PromptTemplate, ChatPromptTemplate, MessagesPlaceholder
 from langchain.memory import ChatMessageHistory
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.runnables.history import RunnableWithMessageHistory
@@ -30,26 +30,24 @@ if __name__ == '__main__':
     load_dotenv()
     print("Nellie: Hi! I'm Nellie, your personal NBA assistant. Hang tight while I load some information for you\n")
 
-    print("Fetching information")
-    vectorstore = Chroma(persist_directory="./vectorstores/2023season", embedding_function=OpenAIEmbeddings())
-    retriever = vectorstore.as_retriever()
+    # print("Fetching information")
+    # vectorstore = Chroma(persist_directory="./vectorstores/2023season", embedding_function=OpenAIEmbeddings())
+    # retriever = vectorstore.as_retriever()
 
     chat = ChatOpenAI()
-
-    from langchain_core.prompts import PromptTemplate
-
     db = SQLDatabase.from_uri("sqlite:///games.db")
+
     sql_template = '''Given an input question, first create a syntactically correct sqlite query to run, then look at 
     the results of the query and return the answer. Select up to {top_k} rows from the following tables: {table_info}
-    Use the following format:
+    Retrieve only the output from the database. Use the following format:
 
-    Question: "{question}"
+    Question: "{input}"
     SQL Query: "query"
     SQL Result: "result"
-    Answer: "answer"
     
-    If given a date, format it in the format "MMMM DD, YYYY". Example: november 1st 2022 would be "November 1, 2022". Search for dates in this format
-    {input}
+    If given a date, format it in the format "MMMM DD, YYYY". Example: november 1st 2022 would be "November 1, 
+    2022". Search for dates in this format. If asked for games on a specific date, list them all, not just the first 
+    one.
     '''
     sql_prompt = PromptTemplate.from_template(sql_template
         # [
@@ -63,41 +61,41 @@ if __name__ == '__main__':
     # sql_chain = create_stuff_documents_chain(chat, sql_prompt)
     # sql_prompt = PromptTemplate.from_template(sql_template)
 
-    print("Creating prompt to contextualize question")
-    add_context_to_question_prompt = ChatPromptTemplate.from_messages(
-        [
-            ("system", """Given a chat history and the latest user question which might reference context in the chat
-            history, formulate a standalone question which can be understood without the chat history. Do NOT answer the
-            question, just reformulate it if needed and otherwise return it as is. The context consists of information
-            about NBA games played"""),
-            MessagesPlaceholder("messages"),
-            ("human", "{input}"),
-        ]
-    )
-    add_context_to_question_retriever = create_history_aware_retriever(
-        chat, retriever, add_context_to_question_prompt
-    )
+    # print("Creating prompt to contextualize question")
+    # add_context_to_question_prompt = ChatPromptTemplate.from_messages(
+    #     [
+    #         ("system", """Given a chat history and the latest user question which might reference context in the chat
+    #         history, formulate a standalone question which can be understood without the chat history. Do NOT answer the
+    #         question, just reformulate it if needed and otherwise return it as is. The context consists of information
+    #         about NBA games played"""),
+    #         MessagesPlaceholder("messages"),
+    #         ("human", "{input}"),
+    #     ]
+    # )
+    # add_context_to_question_retriever = create_history_aware_retriever(
+    #     chat, retriever, add_context_to_question_prompt
+    # )
 
-    print("Creating prompt to answer questions")
-    answer_question_prompt = ChatPromptTemplate.from_messages(
-        [
-            (
-                "system",
-                "Your name is Nellie. You are a chatbot having a conversation with a human about the NBA. You should "
-                "answer questions about the NBA players, past or present, their career statistics and accolades. In "
-                "addition to your trained data, use the following pieces of retrieved context to answer the question. "
-                "If you don't know the answer, just say that you don't know. Use three sentences maximum and keep the "
-                "answer concise."
-                ""
-                "{context}",
-            ),
-            MessagesPlaceholder(variable_name="messages"),
-            ("human", "{input}")
-        ]
-    )
-    answer_question_retriever = create_stuff_documents_chain(chat, answer_question_prompt)
-
-    chain = create_retrieval_chain(add_context_to_question_retriever, answer_question_retriever)
+    # print("Creating prompt to answer questions")
+    # answer_question_prompt = ChatPromptTemplate.from_messages(
+    #     [
+    #         (
+    #             "system",
+    #             "Your name is Nellie. You are a chatbot having a conversation with a human about the NBA. You should "
+    #             "answer questions about the NBA players, past or present, their career statistics and accolades. In "
+    #             "addition to your trained data, use the following pieces of retrieved context to answer the question. "
+    #             "If you don't know the answer, just say that you don't know. Use three sentences maximum and keep the "
+    #             "answer concise."
+    #             ""
+    #             "{context}",
+    #         ),
+    #         MessagesPlaceholder(variable_name="messages"),
+    #         ("human", "{input}")
+    #     ]
+    # )
+    # answer_question_retriever = create_stuff_documents_chain(chat, answer_question_prompt)
+    #
+    # chain = create_retrieval_chain(add_context_to_question_retriever, answer_question_retriever)
 
     print("Chaining retrievers together\n")
     conversation = RunnableWithMessageHistory(
@@ -123,5 +121,6 @@ if __name__ == '__main__':
             # )
             # print(res)
 
-            res = sql_chain.invoke({"input": userMessage, "question": userMessage, "top_k": "20", "table_info": "games"})
+            res = sql_chain.invoke(
+                {"input": userMessage, "question": userMessage, "top_k": "20", "table_info": "games"})
             print(res)

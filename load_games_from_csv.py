@@ -20,8 +20,6 @@ if __name__ == '__main__':
     df.to_sql("games", engine, index=False)
 
     db = SQLDatabase(engine=engine)
-    print(db.dialect)
-    print(db.get_usable_table_names())
     # print(db.run("SELECT * FROM games WHERE 'Home team' == 'Toronto Raptors';"))
 
     # agent_executor = create_sql_agent(ChatOpenAI(), db=db, agent_type="openai-tools", verbose=True)
