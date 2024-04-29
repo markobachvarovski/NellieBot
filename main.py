@@ -1,22 +1,12 @@
-from typing import List
-
-from langchain.chains.combine_documents import create_stuff_documents_chain
-from langchain.chains.history_aware_retriever import create_history_aware_retriever
-from langchain.chains.retrieval import create_retrieval_chain
-from langchain.chains.retrieval_qa.base import RetrievalQA
 from langchain.chains.sql_database.query import create_sql_query_chain
-from langchain_community.document_loaders.csv_loader import CSVLoader
 from langchain_community.utilities.sql_database import SQLDatabase
 from langchain_core.runnables import RunnablePassthrough
-from langchain_experimental.sql import SQLDatabaseChain
 from langchain_core.chat_history import BaseChatMessageHistory
-from langchain_openai import ChatOpenAI, OpenAIEmbeddings, OpenAI
+from langchain_openai import ChatOpenAI
 from langchain.prompts import PromptTemplate, ChatPromptTemplate, MessagesPlaceholder
 from langchain.memory import ChatMessageHistory
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.runnables.history import RunnableWithMessageHistory
-from langchain_community.vectorstores import Chroma
-from langchain_text_splitters import RecursiveCharacterTextSplitter
 from dotenv import load_dotenv
 
 session_store = {}
@@ -30,7 +20,7 @@ def get_session_history(session_id: str) -> BaseChatMessageHistory:
 
 if __name__ == '__main__':
     load_dotenv()
-    print("Nellie: Hi! I'm Nellie, your personal NBA assistant. Hang tight while I load some information for you\n")
+    print("Hi! I'm Nellie, your personal NBA assistant. Hang tight while I load some information for you\n")
 
     chat = ChatOpenAI()
     output_parser = StrOutputParser()
@@ -55,9 +45,6 @@ if __name__ == '__main__':
     '''
     sql_prompt = PromptTemplate.from_template(sql_template)
     sql_chain = create_sql_query_chain(chat, db, prompt=sql_prompt)
-    # sql_chain = SQLDatabaseChain.from_llm(chat, db, prompt=sql_prompt, return_intermediate_steps=False)
-    # sql_chain = create_stuff_documents_chain(chat, sql_prompt)
-    # sql_prompt = PromptTemplate.from_template(sql_template)
 
     add_context_to_question_prompt = ChatPromptTemplate.from_messages(
         [
@@ -78,27 +65,38 @@ if __name__ == '__main__':
                                                              "top_k": RunnablePassthrough(),
                                                              "table_info": RunnablePassthrough()}
 
+    format_answer_prompt = PromptTemplate.from_template('''You should receive an input that contains a substring 
+    "Answer:". Return everything after that substring. Do not modify it, only return it. If the substring is not 
+    present, return that you don't know the answer
+    
+    {input}''')
+
+    format_answer_chain = format_answer_prompt | chat | output_parser
+
     chain = context_chain | sql_chain
 
     conversation = RunnableWithMessageHistory(
         chain,
         get_session_history,
         input_messages_key="input",
-        history_messages_key="messages",
-        # output_messages_key="answer",
+        history_messages_key="messages"
     )
+    print("Please enter a session ID:")
+    sessionID = input()
 
-    print("Nellie: I'm ready! Ask me anything or enter ':q' to quit")
+    print("\nI'm ready! Ask me anything or enter ':q' to quit")
     while True:
         userMessage = input()
         if userMessage in [":q", ":Q"]:
-            print("Nellie: See you soon!\n\nExited successfully")
+            print("See you soon!\n\nExited successfully")
             break
         else:
-            res = conversation.invoke(
+            sql_res = conversation.invoke(
                 {"input": userMessage, "top_k": "20", "table_info": "games"},
                 {"configurable":
-                     {"session_id": "1"}
+                     {"session_id": sessionID}
                  },
             )
-            print(res)
+
+            format_answer_res = format_answer_chain.invoke({"input": sql_res})
+            print(format_answer_res)
