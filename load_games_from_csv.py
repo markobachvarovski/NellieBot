@@ -7,7 +7,7 @@ if __name__ == '__main__':
 
     load_dotenv()
 
-    df = pd.read_csv("./assets/2022-2023_season.csv")
+    df = pd.read_csv("./assets/all_seasons.csv")
 
     engine = create_engine("sqlite:///games.db")
     df.to_sql("games", engine, index=False)
